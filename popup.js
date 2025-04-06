@@ -216,8 +216,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Add new task
-    addTaskButton.addEventListener('click', function() {
-        const title = newTaskInput.value.trim();
+    function addTask(title) {
         if (!title) {
             updateStatus('Please enter a task title');
             return;
@@ -237,10 +236,38 @@ document.addEventListener('DOMContentLoaded', function() {
             chrome.storage.sync.set({ tasks: tasks }, function() {
                 renderTasks(tasks);
                 newTaskInput.value = '';
+                newTaskInput.focus(); // Focus back on input for next task
                 updateStatus('Task added successfully');
             });
         });
+    }
+
+    // Add task button event listener
+    addTaskButton.addEventListener('click', function() {
+        const title = newTaskInput.value.trim();
+        addTask(title);
     });
+
+    // Add Enter key event listener for task input
+    newTaskInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const title = newTaskInput.value.trim();
+            addTask(title);
+        }
+    });
+
+    // Add keyboard navigation for tasks
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            // Clear input and focus on it
+            newTaskInput.value = '';
+            newTaskInput.focus();
+        }
+    });
+
+    // Focus on task input when popup opens
+    newTaskInput.focus();
 
     // Add fullscreen button event listener
     fullscreenButton.addEventListener('click', () => {

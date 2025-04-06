@@ -271,43 +271,57 @@ function isWebsiteMonitored(domain) {
 }
 
 // Initialize timer when page loads
-chrome.storage.sync.get(['timeLimit', 'enabled'], async (result) => {
-    if (result.enabled !== false) {
-        const isMonitored = await isWebsiteMonitored(window.location.hostname);
+chrome.storage.sync.get(['enabled', 'timeLimit', 'websites'], async function(result) {
+    if (result.enabled) {
+        const domain = window.location.hostname;
+        const isMonitored = await isWebsiteMonitored(domain);
+        console.log('Domain:', domain, 'Is monitored:', isMonitored);
+        
         if (isMonitored) {
+            timeSpent = 0;
             startTimer(result.timeLimit || 30);
         }
     }
 });
 
-// Listen for visibility changes
-document.addEventListener('visibilitychange', async () => {
+// Listen for messages from popup
+chrome.runtime.onMessage.addListener(async function(request, sender, sendResponse) {
+    if (request.action === 'resetTimer') {
+        const domain = window.location.hostname;
+        const isMonitored = await isWebsiteMonitored(domain);
+        
+        if (isMonitored) {
+            timeSpent = 0;
+            if (isBlocked) {
+                const overlay = document.querySelector('div[style*="position: fixed; top: 0; left: 0; width: 100%; height: 100%;"]');
+                if (overlay) {
+                    overlay.remove();
+                }
+                isBlocked = false;
+            }
+            chrome.storage.sync.get(['timeLimit'], function(result) {
+                startTimer(result.timeLimit || 30);
+            });
+            sendResponse({ success: true });
+        } else {
+            sendResponse({ success: false, message: 'Website not monitored' });
+        }
+    }
+    return true;
+});
+
+// Monitor visibility changes
+document.addEventListener('visibilitychange', async function() {
     if (document.hidden) {
         stopTimer();
     } else {
-        const isMonitored = await isWebsiteMonitored(window.location.hostname);
+        const domain = window.location.hostname;
+        const isMonitored = await isWebsiteMonitored(domain);
+        
         if (isMonitored) {
-            chrome.storage.sync.get(['timeLimit', 'enabled'], (result) => {
-                if (result.enabled !== false) {
-                    startTimer(result.timeLimit || 30);
-                }
+            chrome.storage.sync.get(['timeLimit'], function(result) {
+                startTimer(result.timeLimit || 30);
             });
         }
     }
-});
-
-// Listen for messages from popup
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === 'resetTimer') {
-        timeSpent = 0;
-        if (isBlocked) {
-            const overlay = document.querySelector('div[style*="position: fixed"]');
-            if (overlay) overlay.remove();
-            isBlocked = false;
-        }
-        // Clear the badge when timer is reset
-        chrome.runtime.sendMessage({ action: 'clearBadge' });
-        sendResponse({ success: true });
-    }
-    return true;
 }); 
